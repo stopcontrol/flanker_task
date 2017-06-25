@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Flanker Task</title>
+
+        <script src="jspsych.js"></script>
+        <script src="plugins/jspsych-text.js"></script>
+        <script src="plugins/jspsych-single-stim.js"></script>
+        <link rel="stylesheet" href="css/jspsych.css">
+
+    </head>
+    <body>
+    </body>
+    <script>
+
+    //var ID = jsPsych.randomization.randomID(6);
+
+        /*set up welcome block*/
+        var welcome = {
+          type: "text",
+          text: "Herzlich Willkommen! <br> Drücke eine beliebige Taste um zum Intro zu gelangen"
+        };
+
+        var demog = {
+           type: 'survey-text',
+           data: {
+               trial_id: "demog"
+           },
+           questions: ['<p class = center-block-text style = "font-size: 20px">Bitte gib hier deinen Pr</p>',
+                      '<p class = center-block-text style = "font-size: 20px">Hast du Anmerkungen zu dieser Aufgabe?</p>'],
+           rows: [15, 15],
+           columns: [60,60]
+        };
+
+        /*set up instructions block*/
+        var instructions = {
+          type: "text",
+          text: "<p>In diesem Teil der Studie wirst du jeweils 5 Pfeile am Bildschirm sehen.</p><p>Deine Aufgabe ist es, mithilfe der Pfeiltasten zu entscheiden, in welche Richtung der mittlere Pfeil orientiert ist. </p><br>"+
+            "<p>Drücke die linke Pfeiltaste, wenn der mittlere Pfeil nach links gerichtet ist. <b>(<)</b></p>"+
+            "<p>Drücke die rechte Pfeiltaste, wenn der mittlere Pfeil nach rechts gerichtet ist <b>(>)</b></p>"+
+            "<p><b>Starte durch Drücken einer beliebigen Taste</b></p>",
+          timing_post_trial: 3000
+        };
+
+        /*defining stimuli*/
+        var test_stimuli = [
+          {
+            stimulus: "img/con1.png",
+            data: { stim_type: 'congruent', direction: 'left'}
+          },
+          {
+            stimulus: "img/con2.png",
+            data: { stim_type: 'congruent', direction: 'right'}
+          },
+          {
+            stimulus: "img/inc1.png",
+            data: { stim_type: 'incongruent', direction: 'right'}
+          },
+          {
+            stimulus: "img/inc2.png",
+            data: { stim_type: 'incongruent', direction: 'left'}
+          }
+        ];
+
+        /*randomising stimuli*/
+        var all_trials = jsPsych.randomization.repeat(test_stimuli, 50);
+
+        /*creating random ISI*/
+        var post_trial_gap = function() {
+            return Math.floor(Math.random() * 1500) + 500;
+        };
+
+        /*defining experimental block*/
+        var test_block = {
+          type: 'single-stim',
+          choices: [37, 39],
+          timing_response: 1500,
+          on_finish: function(data){
+              var correct = false;
+              if(data.direction == 'left' &&  data.key_press == '37' && data.rt > -1){
+                correct = true;
+              } else if(data.direction == 'right' && data.key_press == '39' && data.rt > -1){
+                correct = true;
+              }
+              jsPsych.data.addDataToLastTrial({correct: correct});
+            },
+          timeline: all_trials,
+          timing_post_trial: post_trial_gap
+        };
+
+        /*function for getting mean RTs and error rates*/
+        function getSubjectData() {
+
+          var trials = jsPsych.data.getLastTimelineData();
+          console.log(trials.values());
+          var congruent_trials = jsPsych.data.get().filter({stim_type: 'congruent', correct: true});
+          var incongruent_trials = jsPsych.data.get().filter({stim_type: 'incongruent', correct: true});
+
+          var sum_rt_congruent = 0;
+          for (var i = 0; i < congruent_trials.values().length; i++) {
+            sum_rt_congruent += congruent_trials.values()[i].rt;
+
+          }
+          console.log("sum_rt_congruent trials "+sum_rt_congruent);
+
+          var sum_rt_incongruent = 0;
+          for (var i = 0; i < incongruent_trials.values().length; i++) {
+            sum_rt_incongruent += incongruent_trials.values()[i].rt;
+          }
+          console.log("sum_rt_incongruent trials "+ sum_rt_incongruent);
+
+          return {
+            congruent_rt: Math.floor(sum_rt_congruent / congruent_trials.values().length),
+            incongruent_rt: Math.floor(sum_rt_incongruent / incongruent_trials.values().length),
+            accuracy: Math.floor( (congruent_trials.values().length + incongruent_trials.values().length) / trials.values().length * 100)
+          }
+          console.log("congruent_rt: " + getSubject_data.congruent_rt + "| incongruent_rt: " + getSubject_data.incongruent_rt + "| accuracy: " + getSubject_data.accuracy);
+        };
+
+        /*defining debriefing block*/
+        var debrief_block = {
+          type: "text",
+          text: function() {
+            var subject_data = getSubjectData();
+            console.log("congruent_rt: " + subject_data.congruent_rt + "| incongruent_rt: " + subject_data.incongruent_rt + "| accuracy: " + subject_data.accuracy);
+
+            return "<p>Richtige Antworten "+ subject_data.accuracy +"%</p> " +
+            "<p>Durchschnittliche Reaktionszeit kongruent <strong>" + subject_data.congruent_rt + "ms</strong>.</p>"+
+            "<p>Durchschnittliche Reaktionszeit inkongruent <strong>" + subject_data.incongruent_rt + "ms</strong>.</p>"+
+            "<p>Vielen Dank! Beliebige Taste Drücken um den Datendownload zu starten</p>";
+          }
+        };
+
+        /*set up experiment structure*/
+        var timeline = [];
+        timeline.push(welcome);
+        timeline.push(instructions);
+        timeline.push(test_block);
+        timeline.push(debrief_block);
+
+        /*start experiment*/
+        jsPsych.init({
+            timeline: timeline,
+            fullscreen: true,
+            on_finish: function() {
+                jsPsych.data.displayData();
+                jsPsych.data.saveData("filename.csv", jsPsych.data.getDataAsCSV());
+                jsPsych.data.localSave();
+
+            }
+        });
+    </script>
+</html>
